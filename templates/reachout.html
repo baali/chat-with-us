@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+
+{# Base template for the whole site. #}
+{% load compressed %}
+{% load minified_js %}
+
+<head>
+    <meta charset="UTF-8">
+    <title>Talk To TaxExpert</title>
+    <link href="/static/favicon.ico?v=2" rel="shortcut icon">
+
+    {% if not_voyager %}
+    <script type="text/javascript">var dropboxAppKey = "{{ dropboxAppKey }}";</script>
+    {% endif %}
+
+    {# We need to import jQuery before Bootstrap #}
+    {% compressed_css 'common' %}
+    {% block page_params %}
+    {# blueslip needs page_params.debug_mode.  Set it to false by default. #}
+    <script type="text/javascript">
+    var page_params = {debug_mode: false};
+    </script>
+    {% endblock %}
+    {% minified_js 'common' %}
+    {% block customhead %}
+      {% minified_js 'signup' %}
+      {% compressed_css 'portico' %}
+      <script type="text/javascript" src="/static/third/zxcvbn/zxcvbn.js"></script>
+    {% endblock %}
+</head>
+
+<body>
+{% block content %}
+<div class="app register-page">
+  <div class="app-main register-page-container">
+        <div class="register-form">
+          <form class="form-horizontal" id="send_confirm" name="email_form" action="{{ current_url }}" method="post">
+            {% csrf_token %}
+            <div class="control-group">
+              <input type="text" class="email required" placeholder="Enter your work email address" id="email" name="email"/>
+            </div>
+            <input type="submit" class="btn btn-primary btn-small register-button" value="Get Talking!"/>
+          </form>
+          <div id="errors">
+            {% if form.email.errors %}
+              {% for error in form.email.errors %}
+                <div class="alert alert-error">{{ error }}</div>
+              {% endfor %}
+            {% endif %}
+          </div>
+        </div>
+  </div>
+</div>
+<div class="footer-padder"></div>
+</div>
+        <script type="text/javascript">
+        if (window.location.hash.substring(0, 1) === "#") {
+            document.email_form.action += window.location.hash;
+        }
+        </script>
+{% endblock %}
+</body>
+</html>
