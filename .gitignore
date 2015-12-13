@@ -1,0 +1,9 @@
+*~
+*.pyc
+*.pickle
+*.json
+*.txt
+*.csv
+*.gz
+*.zip
+*.pdf
