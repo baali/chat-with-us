@@ -1,13 +1,25 @@
-To extend zulip to enable chatting-with-customers features. 
+This is a Proof-Of-Concept implementation to extend zulip to enable chatting-with-customers features. 
 
- + One extra view was added to expose limited chat UI to customer ~views/support.py~.
- + List of Support accounts which would be mapped with customer are part of ~views/zulip-support.py~
- + For routing two urls are to be added to current ~zproject/urls.py~ which are in ~urls.py~ 
- + To prevent customers from accessing email ids of complete realm we tweaked ~get_status_dict~ in zerver/libs/actions.py
+ + One extra view was added to expose limited chat UI to customer
+   ~views/support.py~.
+ + List of Support accounts which would be mapped with customer are
+   part of ~views/zulip-support.py~
+ + For routing two urls are to be added to current ~zproject/urls.py~
+   which are in ~urls.py~
+ + To prevent customers from accessing email ids of complete realm we
+   tweaked ~get_status_dict~ in zerver/libs/actions.py
 #+BEGIN_SRC code
     # Return no status info for regular users
     if requesting_user_profile.realm.domain != settings.ADMIN_DOMAIN:
         return defaultdict(dict)
 #+END_SRC
- + Similar check was added to ~views/__init__.py~ home function to redirect customer to support interface.
- + These htmls could be rendered inside an iframe on your home page to give you a private, self hosted chat-with-us plugin for your site.
+ + Similar check was added to ~views/__init__.py~ home function to
+   redirect customer to support interface.
+ + At the moment we auto-login customer after asking their
+   email-id. For security purpose, we create a new private stream for
+   the customer and unsubscribe it form previous existing
+   streams. Ideally there should be a way(OAuth or server-to-server
+   authentication) to make sure user is logged in on main site and
+   then enable previous history of chats they had done.
+ + These htmls could be rendered inside an iframe on your home page to
+   give you a private, self hosted chat-with-us plugin for your site.
