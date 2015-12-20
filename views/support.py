@@ -341,7 +341,7 @@ def chat_with_support(request):
         statsd.incr('views.chat_with_support')
         show_invites = False
 
-        product_name = 'TaxSpanner'
+        product_name = 'Product-Name'
         page_params['product_name'] = product_name
         request._log_data['extra'] = "[%s]" % (register_ret["queue_id"],)
         response = render_to_response('zerver/support_chat.html',
