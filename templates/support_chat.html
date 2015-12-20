@@ -111,7 +111,11 @@
                 <div id="page_loading_indicator"></div>
                 <div id="first_run_message" class="empty_feed_notice">
                   <h4>{% trans 'Welcome to' %} {{product_name}}</h4>
-                  <p>{% blocktrans %}Please tell us how can we help you.{% endblocktrans %}</p>
+                  {% if sp_online %}
+                    <p>{% blocktrans %}Please tell us how can we help you.{% endblocktrans %}</p>
+                  {% else %}
+                    <p>Hello, Seems support staff with whom you had talked previously is <strong>offline</strong>. Meanwhile you can leave your messages/query here, it would be delivered to them and they would follow up with you over email.</p>
+                  {% endif %}
                 </div>
                 <div id="empty_narrow_message" class="empty_feed_notice">
                   <h4>{% trans "Nothing's been sent here yet!" %}</h4>
