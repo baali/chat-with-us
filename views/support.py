@@ -11,7 +11,7 @@ from zerver.lib.push_notifications import num_push_devices_for_user
 from zerver.lib.avatar import avatar_url, get_avatar_url
 from zerver.models import Message, UserProfile, Stream, Subscription, \
     email_to_username, get_client, bulk_get_streams, valid_stream_name, \
-    UserMessage, Recipient, get_recipient, get_realm
+    UserMessage, Recipient, get_recipient, get_realm, UserPresence
 from zerver.lib.create_user import create_user
 from zerver.lib.actions import do_get_streams, bulk_remove_subscriptions, \
     bulk_add_subscriptions, do_events_register, create_stream_if_needed, \
@@ -20,7 +20,7 @@ from zproject.backends import password_auth_enabled
 from zerver.lib.utils import statsd
 from zerver.lib.initial_password import initial_password
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 import logging
 import calendar
 import time
@@ -28,6 +28,7 @@ import ujson
 import simplejson
 
 from zerver.forms import HomepageForm
+from support_staff import support_ids
 
 def is_buggy_ua(agent):
     """Discrimiate CSS served to clients based on User Agent
@@ -125,40 +126,60 @@ def sent_time_in_epoch_seconds(user_message):
     # Return the epoch seconds in UTC.
     return calendar.timegm(user_message.message.pub_date.utctimetuple())
 
+def get_support(user_profile, available_sp):
+    support_profile = None
+    if user_profile:
+        last_msg = user_profile.message_set.last()
+        if last_msg:
+            stream = Stream.objects.get(id=last_msg.recipient.type_id)
+            if Subscription.objects.filter(recipient__type=Recipient.STREAM,
+                                           recipient__type_id=stream.id,
+                                           user_profile__is_active=True,
+                                           active=True).exclude(user_profile=user_profile).exists():
+                support_profile = Subscription.objects.filter(recipient__type=Recipient.STREAM,
+                                                              recipient__type_id=stream.id,
+                                                              user_profile__is_active=True,
+                                                              active=True).exclude(user_profile=user_profile).first().user_profile
+                if support_profile.email not in support_ids:
+                    #  To make sure we return Support ids which are
+                    #  part of support_id list
+                    support_profile = None
+    if not support_profile:
+        import random
+        support = random.choice(available_sp)
+        support_profile = get_user_profile_by_email(support)
+    return support_profile
+    
 def chat_with_support(request):
-    if request.method == 'POST':
+    # Get recently "active" SPs
+    time_threshold = datetime.now() - timedelta(minutes=1)
+    available_sp = [user_p.user_profile.email for user_p in UserPresence.objects.filter(timestamp__gte=time_threshold) if user_p.user_profile.email in support_ids]
+    if request.method == 'POST' and bool(available_sp):
         email = request.POST['email']
-        from support_staff import support_ids
-	support_profile = None
         try:
             user_profile = get_user_profile_by_email(email)
-            last_msg = user_profile.message_set.last()
-            if last_msg:
-                stream = Stream.objects.get(id=last_msg.recipient.type_id)
-                if Subscription.objects.filter(recipient__type=Recipient.STREAM,
-                                               recipient__type_id=stream.id,
-                                               user_profile__is_active=True,
-                                               active=True).exclude(user_profile=user_profile).exists():
-                    support_profile = Subscription.objects.filter(recipient__type=Recipient.STREAM,
-                                                                  recipient__type_id=stream.id,
-                                                                  user_profile__is_active=True,
-                                                                  active=True).exclude(user_profile=user_profile).first().user_profile
-		    if support_profile.email not in support_ids:
-		        support_profile = None
+            support_profile = get_support(user_profile, available_sp)
         except UserProfile.DoesNotExist:
+            support_profile = get_support(None, available_sp)
             password = initial_password(email)
             short_name = email_to_username(email)
-            import random
-            support = random.choice(support_ids)
-            support_profile = get_user_profile_by_email(support)
-            # user_profile = None
+            # both customer and Support staff have to belong to same
+            # realm
             user_profile = create_user(email, password, 
-                                       get_realm("taxspanner.com"), 
+                                       support_profile.realm, 
                                        short_name, short_name)
-        if not support_profile:
-            import random                
-            support = random.choice(support_ids)
-            support_profile = get_user_profile_by_email(support)
+
+        try:
+            sp_presence = UserPresence.objects.get(user_profile=support_profile)
+            from django.utils import timezone
+            now_aware = timezone.now()
+            # Support user has been offline since more than an 15 minutes
+            if (now_aware - sp_presence.timestamp).seconds > 900:
+                sp_online = False
+            else:
+                sp_online = True
+        except UserPresence.DoesNotExist:
+            sp_online = False
 
         if user_profile.email in support_ids:
             logging.info("%s Logging in support user" % (user_profile.email))
@@ -167,20 +188,22 @@ def chat_with_support(request):
             logging.warning("%s user belonging to different real tried to access support interface" % (user_profile.email))
             return HttpResponseRedirect(reverse('zerver.views.home'))
 
-        # check for logged in user(request.user) and then either
-        # subscribe of unsubscribe from previous streams
         login(request, authenticate(username=user_profile.email, use_dummy_backend=True))
         request.session.modified = True
         request._email = email
         request.client = get_client("website")
         # current streams and unsubscribing user from it
-        for stream_sub in do_get_streams(user_profile):
-            streams, _ = list_to_streams([stream_sub['name']], user_profile)
-            (removed, not_subscribed) = bulk_remove_subscriptions([user_profile], streams)
         narrow = []
         narrow_stream = None
         narrow_topic = date.today().strftime('%d-%m-%Y')
         stream = email+' on '+datetime.now().strftime('%d-%m-%Y-%H')
+        for stream_sub in do_get_streams(user_profile):
+            if stream_sub['name'] == stream:
+                # skipping most recent stream customer has used
+                continue
+            streams, _ = list_to_streams([stream_sub['name']], user_profile)
+            (removed, not_subscribed) = bulk_remove_subscriptions([user_profile], streams)
+
         narrow_stream, created = create_stream_if_needed(user_profile.realm,
                                                          stream,
                                                          invite_only=True)
@@ -329,6 +352,7 @@ def chat_with_support(request):
                                        'show_debug':
                                             settings.DEBUG and ('show_debug' in request.GET),
                                        'show_invites': show_invites,
+                                       'sp_online': sp_online,
                                        'is_admin': False,
                                        'show_webathena': False,
                                        'enable_feedback': settings.ENABLE_FEEDBACK,
@@ -341,6 +365,7 @@ def chat_with_support(request):
     form = create_homepage_form(request)
     return render_to_response('zerver/reachout.html',
                               {'form': form,
+                               'sp_available': bool(available_sp),
                                'current_url': request.get_full_path,},
                               context_instance=RequestContext(request))
 
