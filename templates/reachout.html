@@ -34,22 +34,29 @@
 {% block content %}
 <div class="app register-page">
   <div class="app-main register-page-container">
-        <div class="register-form">
-          <form class="form-horizontal" id="send_confirm" name="email_form" action="{{ current_url }}" method="post">
-            {% csrf_token %}
-            <div class="control-group">
-              <input type="text" class="email required" placeholder="Enter your work email address" id="email" name="email"/>
-            </div>
-            <input type="submit" class="btn btn-primary btn-small register-button" value="Get Talking!"/>
-          </form>
-          <div id="errors">
-            {% if form.email.errors %}
-              {% for error in form.email.errors %}
-                <div class="alert alert-error">{{ error }}</div>
-              {% endfor %}
-            {% endif %}
-          </div>
+    {% if sp_available %}
+    <div class="register-form">
+      <form class="form-horizontal" id="send_confirm" name="email_form" action="{{ current_url }}" method="post">
+        {% csrf_token %}
+        <div class="control-group">
+          <input type="text" class="email required" placeholder="Enter your [registered] email address" id="email" name="email"/>
         </div>
+        <input type="submit" class="btn btn-primary btn-small register-button" value="Get Talking!"/>
+      </form>
+      <div id="errors">
+        {% if form.email.errors %}
+          {% for error in form.email.errors %}
+          <div class="alert alert-error">{{ error }}</div>
+          {% endfor %}
+        {% endif %}
+      </div>
+    </div>
+    {% else %}
+      <div id="first_run_message" class="empty_feed_notice">
+        <p>Hello, our support team is offline at the moment, please email us at <a href="mailto:support@domain.com" title="Contact via Email">support@taxspanner.com</a> with you query and we will follow up with you there.</p>
+        <p>Apologies for Inconvenience.</p>
+      </div>
+    {% endif %}
   </div>
 </div>
 <div class="footer-padder"></div>
