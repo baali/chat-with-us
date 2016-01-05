@@ -216,8 +216,20 @@ def chat_with_support(request):
         narrow = [["stream", narrow_stream.name]]
         narrow.append(["topic", narrow_topic])
 
-        register_ret = do_events_register(user_profile, request.client,
-                                          apply_markdown=True, narrow=narrow)
+        try:
+            register_ret = do_events_register(user_profile, request.client,
+                                              apply_markdown=True, narrow=narrow)
+        except Exception as e:
+            logging.error("Failed to connect user:%s for %s" % (user_profile.email, str(e)))
+            form = create_homepage_form(request)
+            form.is_valid()
+            form.add_error(None, "Sorry we are having trouble connecting you with out Support staff over chat. You can try again or mail us your query at support@taxspanner.com")
+            return render_to_response('zerver/reachout.html',
+                                      {'form': form,
+                                       'sp_available': bool(available_sp),
+                                       'current_url': request.get_full_path,},
+                                      context_instance=RequestContext(request))
+
         # customer has is retrying to connect to support on same day
         user_has_messages = (register_ret['max_message_id'] != -1)
         # Reset our don't-spam-users-with-email counter since the
