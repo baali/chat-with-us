@@ -197,15 +197,8 @@ def chat_with_support(request):
         # current streams and unsubscribing user from it
         narrow = []
         narrow_stream = None
-        narrow_topic = date.today().strftime('%d-%m-%Y')
-        stream = email+' on '+datetime.now().strftime('%d-%m-%Y-%H')
-        for stream_sub in do_get_streams(user_profile):
-            if stream_sub['name'] == stream:
-                # skipping most recent stream customer has used
-                continue
-            streams, _ = list_to_streams([stream_sub['name']], user_profile)
-            (removed, not_subscribed) = bulk_remove_subscriptions([user_profile], streams)
-
+        narrow_topic = datetime.now().strftime('%d-%m-%Y-%H-%M-%S')
+        stream = email
         narrow_stream, created = create_stream_if_needed(user_profile.realm,
                                                          stream,
                                                          invite_only=True)
