@@ -155,7 +155,7 @@ def chat_with_support(request):
     time_threshold = datetime.now() - timedelta(minutes=1)
     available_sp = [user_p.user_profile.email for user_p in UserPresence.objects.filter(timestamp__gte=time_threshold) if user_p.user_profile.email in support_ids]
     if request.method == 'POST' and bool(available_sp):
-        email = request.POST['email']
+        email = request.POST['email'].strip().lower()
         try:
             user_profile = get_user_profile_by_email(email)
             # One Admin account which has access to all streams
