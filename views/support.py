@@ -158,6 +158,8 @@ def chat_with_support(request):
         email = request.POST['email']
         try:
             user_profile = get_user_profile_by_email(email)
+            # One Admin account which has access to all streams
+            admin_profile = get_user_profile_by_email("admin@domain.com")
             support_profile = get_support(user_profile, available_sp)
         except UserProfile.DoesNotExist:
             support_profile = get_support(None, available_sp)
@@ -209,7 +211,8 @@ def chat_with_support(request):
                                                          invite_only=True)
         if created:
             # make support ADMIN of stream
-            do_change_is_admin(support_profile, True)
+            do_add_subscription(admin_profile, narrow_stream)
+            do_change_is_admin(admin_profile, True)
             do_add_subscription(support_profile, narrow_stream)
         do_add_subscription(user_profile, narrow_stream)
 
